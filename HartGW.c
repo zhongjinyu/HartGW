@@ -107,16 +107,28 @@
                 {
                     HT.HTCmds[i].iMapAddress=strtoul(node->child->value.text.string,NULL,10);
                 }
+                node=mxmlFindElement(hart,hart,"hart_device_type",NULL,NULL,MXML_DESCEND);
+                if(node!=NULL)
+                {
+                    HT.HTCmds[i].iDeviceType=strtoul(node->child->value.text.string,NULL,10);
+                }
+                node=mxmlFindElement(hart,hart,"hart_hub_port",NULL,NULL,MXML_DESCEND);
+                if(node!=NULL)
+                {
+                    HT.HTCmds[i].iPort=strtoul(node->child->value.text.string,NULL,10);
+                }
                 if(hart_debug_mode)   //如果在调试模式下,就在syslog中显示每条命令的内容
                 {
-                    syslog(LOG_DEBUG,"[DEBUG][HartGW]HT_CMD(%d):EN=%d,ID=%X,%X,%X,CMD=%d,MapAddr=%d",
+                    syslog(LOG_DEBUG,"[DEBUG][HartGW]HT_CMD(%d):EN=%d,ID=%X,%X,%X,CMD=%d,MapAddr=%d,Type=%d,HubPort=%d",
                         i+1,
                         HT.HTCmds[i].iEn,
                         HT.HTCmds[i].bID[0],
                         HT.HTCmds[i].bID[1],
                         HT.HTCmds[i].bID[2],
                         HT.HTCmds[i].bCMD,
-                        HT.HTCmds[i].iMapAddress);
+                        HT.HTCmds[i].iMapAddress,
+                        HT.HTCmds[i].iDeviceType,
+                        HT.HTCmds[i].iPort);
                 }    
                 i=i+1;                                      
             }
@@ -292,15 +304,45 @@ unsigned int Hart_ComDO()
     unsigned char cmd;                          //已经发出的命令中的命令号
     unsigned short cc;
     unsigned int mapaddress;                    //已经发出的命令中的映射到modnet的地址
-    int i,m; 
+    int i,m,n; 
  
     if(hart_recv_len)     //有接受的数据需要处理
     {
+        n=0;
+        for (i=0;i<hart_recv_len-3;i++)                           //处理返回命令的0xFF头
+        {
+            if((hart_recv_buf[i]==0xff)&&(hart_recv_buf[i+1]==0xff)&&(hart_recv_buf[i+2]==0xff))
+            {
+                for(m=i;m<hart_recv_len;m++)
+                {
+                    if(hart_recv_buf[m]!=0xff)                  //去除0xff命令头后,找到返回命令的第一个字节
+                    {
+                        n=m;
+                        break;                                  //结束for循环
+                    }
+                }
+                for(m=n;m<hart_recv_buf;m++)
+                {
+                    hart_recv_buf[m-n]=hart_recv_buf[m];        //去掉命令头,保留命令体
+                }
+                hart_recv_len=hart_recv_len-n;                  //重新计算命令长度
+                break;                                          //结束for循环
+            }
+        }
+        if(n==0)                                                //没有找到命令头
+        {
+            syslog(LOG_DEBUG,"[ERR][HartGW][%s]No Head!",coms.sPortName);
+            hart_recv_len=0;
+            memset(hart_recv_buf,0,sizeof(hart_recv_buf));
+            HT.iIntervalCount=HT.iInterval;             //设置下一条命令发送的延迟时间
+            HT.HTCmds[HT.iSendedIndex].iFailedCount++;  //该条命令通讯失败次数+1
+            return 1;            
+        }
         id[0]=HT.HTCmds[HT.iSendedIndex].bID[0];                //取得已经发出的命令的ID号
         id[1]=HT.HTCmds[HT.iSendedIndex].bID[1];
         id[2]=HT.HTCmds[HT.iSendedIndex].bID[2];
         cmd=HT.HTCmds[HT.iSendedIndex].bCMD;                    //取得已经发出的命令的命令号
-        m=HT.HTCmds[HT.iSendedIndex].iLen;
+//        m=HT.HTCmds[HT.iSendedIndex].iLen;
         mapaddress=HT.HTCmds[HT.iSendedIndex].iMapAddress-1;    //取得已经发出的命令映射到modnet的地址
 
         sscanf()
@@ -309,7 +351,7 @@ unsigned int Hart_ComDO()
         in_id[2]=hart_recv_buf[5];
         in_cmd=hart_recv_buf[6];
 
-        if(hart_recv_len<5)                               // 返回的命令太短
+        if(hart_recv_len<8)                               // 返回的命令太短
         {
             syslog(LOG_DEBUG,"[ERR][HartGW][%s]back too short!",coms.sPortName);
             hart_recv_len=0;
