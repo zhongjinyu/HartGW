@@ -29,7 +29,7 @@
 <hart index="3">
 	<cmd_enable>1</cmd_enable>
 	<hart_id>0xaa,0xbb,0xcc</hart_id>
-	<hart_cmd_no>3</hart_cmd_no>
+	<hart_cmd_no>12</hart_cmd_no>
 	<modnet_map_address>100</modnet_map_address>
 	<hart_device_type>1</hart_device_type>
 	<hart_hub_port>3</hart_hub_port>
@@ -37,7 +37,7 @@
 <hart index="4">
 	<cmd_enable>1</cmd_enable>
 	<hart_id>0x11,0x22,0x33</hart_id>
-	<hart_cmd_no>4</hart_cmd_no>
+	<hart_cmd_no>13</hart_cmd_no>
 	<modnet_map_address>100</modnet_map_address>
 	<hart_device_type>1</hart_device_type>
 	<hart_hub_port>4</hart_hub_port>

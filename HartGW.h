@@ -11,7 +11,6 @@
 #include <mxml.h>
 
 #include "serial.h"		//自己定义的串口通讯头文件
-//#include "hartcmd.h"	//hart协议解析
 #include "sharedmem.h"
 
 #define HART_CMDS_NUM_MAX  200
@@ -32,7 +31,7 @@ struct hartcmd_struct
     unsigned int iSuccCount;        //本条命令通讯成功的次数
     unsigned int iFailedCount;      //本条命令通讯失败的次数
     unsigned int iTimeoutCount;     //通讯超时的次数
-    unsigned char bID[3];           //本条命令使用的Hart ID
+    unsigned char bID[5];           //本条命令使用的Hart ID
     unsigned char bCMD;             //本条命令使用的Hart命令号
     unsigned int iMapAddress;       //本条命令使用的映射到MODNET的寄存器地址
     unsigned int iDeviceType;       //本条命令对应的Hart设备的类型,在解析返回值时根据不同的设备类型可能解析的结果不同,0代表通用设备
@@ -59,7 +58,7 @@ unsigned int hart_run_status_reg;         //将Hart运行状态写入到这个Mo
 struct timeval tv_start,tv_end;         //记录开始轮询命令的开始时间和结束时间
 unsigned int hart_debug_mode,hart_test_mode;
 
-int HartGW_Init();														//读取xml配置文件初始化
+int HartGW_Init(char *ConfigFileName);									//读取xml配置文件初始化
 unsigned char Hart_CmdCheckCode(unsigned char *cmd_buf,int cmd_len);	//生成Hart命令的校验码
 unsigned int Hart_Send();												//根据需要生成Hart命令并发送
-unsigned int Hart_ComDO()											//处理返回的modbusRTU命令
+unsigned int Hart_ComDO();												//处理返回的modbusRTU命令

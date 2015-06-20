@@ -15,6 +15,9 @@
 #define SerialPort_Nums 4
 #define SerialPort_Timeout  500    //超时默认设置=2秒
 
+extern unsigned char hart_recv_buf[2500];        //Hart接受返回的命令缓存
+extern unsigned int hart_recv_len;               //Hart接受返回的命令缓存长度
+
 struct SerialPort_struct
 {
     char sPortName[50];             //串口设备名称
