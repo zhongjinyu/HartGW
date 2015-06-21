@@ -6,7 +6,7 @@
     FILE *fp;
     mxml_node_t *xml_tree;
     mxml_node_t *hart,*node;
-    int i;
+    int i,t1,t2,t3,t4,t5;
     char filename[50]="//zqkj//config//";
 
     memset(hart_recv_buf,0,sizeof(hart_recv_buf));  //清空接受缓存
@@ -39,7 +39,7 @@
     {
         coms.iSpeed=strtoul(node->child->value.text.string,NULL,10);
     }
-    node=mxmlFindElement(xml_tree,xml_tree,"Com_Time_Out",NULL,NULL,MXML_DESCEND);  //获取Baud
+    node=mxmlFindElement(xml_tree,xml_tree,"Com_Time_Out",NULL,NULL,MXML_DESCEND);  //Com_Time_Out
     if(node!=NULL)
     {
         coms.itimeout=strtoul(node->child->value.text.string,NULL,10);
@@ -92,12 +92,13 @@
                 if(node!=NULL)
                 {
                     //读取Hart ID
-                    sscanf(node->child->value.text.string,"%i,%i,%i,%i,%i",
-                            &HT.HTCmds[i].bID[0],
-                            &HT.HTCmds[i].bID[1],
-                            &HT.HTCmds[i].bID[2],
-                            &HT.HTCmds[i].bID[3],
-                            &HT.HTCmds[i].bID[4]);
+                    sscanf(node->child->value.text.string,"%X,%X,%X,%X,%X",&t1,&t2,&t3,&t4,&t5);
+                    HT.HTCmds[i].bID[0]=t1;
+                    HT.HTCmds[i].bID[1]=t2;
+                    HT.HTCmds[i].bID[2]=t3;
+                    HT.HTCmds[i].bID[3]=t4;
+                    HT.HTCmds[i].bID[4]=t5;
+
                 } 
                 node=mxmlFindElement(hart,hart,"hart_cmd_no",NULL,NULL,MXML_DESCEND);
                 if(node!=NULL)
@@ -121,7 +122,7 @@
                 }
                 if(hart_debug_mode)   //如果在调试模式下,就在syslog中显示每条命令的内容
                 {
-                    syslog(LOG_DEBUG,"[DEBUG][HartGW]HT_CMD(%d):EN=%d,ID=%X,%X,%X,%X,%X,CMD=%d,MapAddr=%d,Type=%d,HubPort=%d",
+                    syslog(LOG_DEBUG,"[DEBUG][HartGW][CONFIG]Index=%d#,EN=%d,ID=0x%02X,0x%02X,0x%02X,0x%02X,0x%02X,CMD=%d,MapAddr=%d,Type=%d,HubPort=%d",
                         i+1,
                         HT.HTCmds[i].iEn,
                         HT.HTCmds[i].bID[0],
@@ -157,7 +158,7 @@ unsigned char Hart_CmdCheckCode(unsigned char *cmd_buf,int cmd_len)
     int i;
 
     checkcode=0;
-    for(i=0;i<cmd_len-1;i++)
+    for(i=0;i<cmd_len;i++)
     {
         checkcode=checkcode ^ cmd_buf[i];
     }
@@ -169,10 +170,11 @@ unsigned int Hart_Send()
 {
     unsigned int i,index;
     
-    if(coms.bfree)          //串口处于空闲状态,可以发送命令
+    if(coms.bfree)               //串口处于空闲状态,可以发送命令
     {
-        if(HT.iIntervalCount==0) //命令之间的间隔时间到,可以发送下一条命令
+        if((HT.iIntervalCount==0)||(coms.btimeout))        //命令之间的间隔时间到或者串口超时,可以发送下一条命令
         {
+            HT.iIntervalCount=HT.iInterval;
             for(i=HT.iCmdIndex;i<HART_CMDS_NUM_MAX;i++)    //从上次发送的命令的下一条命令开始,遍历到最后,找到需要发送的命令
             {
                if(HT.HTCmds[i].iEn)                             //找到需要发送的命令
@@ -180,108 +182,108 @@ unsigned int Hart_Send()
                     switch (HT.HTCmds[i].bCMD)                  //根据命令号不同的处理
                     {
                         case 1:
-                            memcpy(coms.send_buf,hart_cmd_1,strlen(hart_cmd_1));                        //设置命令内容
+                            memcpy(coms.send_buf,hart_cmd_1,sizeof(hart_cmd_1));                        //设置命令内容
                             coms.send_buf[6]=HT.HTCmds[i].bID[0];                                       //设置该设备的Hart ID
                             coms.send_buf[7]=HT.HTCmds[i].bID[1];
                             coms.send_buf[8]=HT.HTCmds[i].bID[2];
                             coms.send_buf[9]=HT.HTCmds[i].bID[3];
                             coms.send_buf[10]=HT.HTCmds[i].bID[4];
-                            coms.send_buf[13]=Hart_CmdCheckCode(coms.send_buf+5,strlen(hart_cmd_1)-6);  //设置校验码
-                            coms.isend_len=strlen(hart_cmd_1);
+                            coms.send_buf[13]=Hart_CmdCheckCode(coms.send_buf+5,sizeof(hart_cmd_1)-6);  //设置校验码
+                            coms.isend_len=sizeof(hart_cmd_1);
                             if(hart_debug_mode)
                             {
-                                syslog(LOG_DEBUG,"[DEBUG][HartGW][CMD1]Cmds=%d,ID=%d,%d,%d,CheckCode=%d",
-                                    i,coms.send_buf[8],coms.send_buf[9],coms.send_buf[10],coms.send_buf[13]);
+                                syslog(LOG_DEBUG,"[DEBUG][HartGW][SEND_CMD=1][%s]Index=%d#,ID=0x%02X,0x%02X,0x%02X,CheckCode=0x%02X,len=%d",
+                                    coms.sPortName,i+1,coms.send_buf[8],coms.send_buf[9],coms.send_buf[10],coms.send_buf[13],coms.isend_len);
                             }
                             break;
                         case 2:
-                            memcpy(coms.send_buf,hart_cmd_2,strlen(hart_cmd_2));                        //设置命令内容
+                            memcpy(coms.send_buf,hart_cmd_2,sizeof(hart_cmd_2));                        //设置命令内容
                             coms.send_buf[6]=HT.HTCmds[i].bID[0];                                       //设置该设备的Hart ID
                             coms.send_buf[7]=HT.HTCmds[i].bID[1];
                             coms.send_buf[8]=HT.HTCmds[i].bID[2];
                             coms.send_buf[9]=HT.HTCmds[i].bID[3];
                             coms.send_buf[10]=HT.HTCmds[i].bID[4];
-                            coms.send_buf[13]=Hart_CmdCheckCode(coms.send_buf+5,strlen(hart_cmd_2)-6);  //设置校验码
-                            coms.isend_len=strlen(hart_cmd_2);
+                            coms.send_buf[13]=Hart_CmdCheckCode(coms.send_buf+5,sizeof(hart_cmd_2)-6);  //设置校验码
+                            coms.isend_len=sizeof(hart_cmd_2);
                             if(hart_debug_mode)
                             {
-                                syslog(LOG_DEBUG,"[DEBUG][HartGW][CMD2]Cmds=%d,ID=%d,%d,%d,CheckCode=%d",
-                                    i,coms.send_buf[8],coms.send_buf[9],coms.send_buf[10],coms.send_buf[13]);
+                                syslog(LOG_DEBUG,"[DEBUG][HartGW][SEND_CMD=2][%s]Index=%d#,ID=0x%02X,0x%02X,0x%02X,CheckCode=0x%02X,len=%d",
+                                    coms.sPortName,i+1,coms.send_buf[8],coms.send_buf[9],coms.send_buf[10],coms.send_buf[13],coms.isend_len);
                             } 
                             break;                      
                         case 12:
-                            memcpy(coms.send_buf,hart_cmd_12,strlen(hart_cmd_12));                      //设置命令内容
+                            memcpy(coms.send_buf,hart_cmd_12,sizeof(hart_cmd_12));                      //设置命令内容
                             coms.send_buf[6]=HT.HTCmds[i].bID[0];                                       //设置该设备的Hart ID
                             coms.send_buf[7]=HT.HTCmds[i].bID[1];
                             coms.send_buf[8]=HT.HTCmds[i].bID[2];
                             coms.send_buf[9]=HT.HTCmds[i].bID[3];
                             coms.send_buf[10]=HT.HTCmds[i].bID[4];
-                            coms.send_buf[13]=Hart_CmdCheckCode(coms.send_buf+5,strlen(hart_cmd_12)-6); //设置校验码
-                            coms.isend_len=strlen(hart_cmd_12);
+                            coms.send_buf[13]=Hart_CmdCheckCode(coms.send_buf+5,sizeof(hart_cmd_12)-6); //设置校验码
+                            coms.isend_len=sizeof(hart_cmd_12);
                             if(hart_debug_mode)
                             {
-                                syslog(LOG_DEBUG,"[DEBUG][HartGW][CMD12]Cmds=%d,ID=%d,%d,%d,CheckCode=%d",
-                                    i,coms.send_buf[8],coms.send_buf[9],coms.send_buf[10],coms.send_buf[13]);
+                                syslog(LOG_DEBUG,"[DEBUG][HartGW][SEND_CMD=12][%s]Index=%d#,ID=0x%02X,0x%02X,0x%02X,CheckCode=0x%02X,len=%d",
+                                    coms.sPortName,i+1,coms.send_buf[8],coms.send_buf[9],coms.send_buf[10],coms.send_buf[13],coms.isend_len);
                             }
                             break;
                         case 13:
-                            memcpy(coms.send_buf,hart_cmd_13,strlen(hart_cmd_13));                      //设置命令内容
+                            memcpy(coms.send_buf,hart_cmd_13,sizeof(hart_cmd_13));                      //设置命令内容
                             coms.send_buf[6]=HT.HTCmds[i].bID[0];                                       //设置该设备的Hart ID
                             coms.send_buf[7]=HT.HTCmds[i].bID[1];
                             coms.send_buf[8]=HT.HTCmds[i].bID[2];
                             coms.send_buf[9]=HT.HTCmds[i].bID[3];
                             coms.send_buf[10]=HT.HTCmds[i].bID[4];
-                            coms.send_buf[13]=Hart_CmdCheckCode(coms.send_buf+5,strlen(hart_cmd_13)-6); //设置校验码
-                            coms.isend_len=strlen(hart_cmd_13);
+                            coms.send_buf[13]=Hart_CmdCheckCode(coms.send_buf+5,sizeof(hart_cmd_13)-6); //设置校验码
+                            coms.isend_len=sizeof(hart_cmd_13);
                             if(hart_debug_mode)
                             {
-                                syslog(LOG_DEBUG,"[DEBUG][HartGW][CMD13]Cmds=%d,ID=%d,%d,%d,CheckCode=%d",
-                                    i,coms.send_buf[8],coms.send_buf[9],coms.send_buf[10],coms.send_buf[13]);
+                                syslog(LOG_DEBUG,"[DEBUG][HartGW][SEND_CMD=13][%s]Index=%d#,ID=0x%02X,0x%02X,0x%02X,CheckCode=0x%02X,len=%d",
+                                    coms.sPortName,i+1,coms.send_buf[8],coms.send_buf[9],coms.send_buf[10],coms.send_buf[13],coms.isend_len);
                             }
                             break;
                         case 14:
-                            memcpy(coms.send_buf,hart_cmd_14,strlen(hart_cmd_14));                      //设置命令内容
+                            memcpy(coms.send_buf,hart_cmd_14,sizeof(hart_cmd_14));                      //设置命令内容
                             coms.send_buf[6]=HT.HTCmds[i].bID[0];                                       //设置该设备的Hart ID
                             coms.send_buf[7]=HT.HTCmds[i].bID[1];
                             coms.send_buf[8]=HT.HTCmds[i].bID[2];
                             coms.send_buf[9]=HT.HTCmds[i].bID[3];
                             coms.send_buf[10]=HT.HTCmds[i].bID[4];
-                            coms.send_buf[13]=Hart_CmdCheckCode(coms.send_buf+5,strlen(hart_cmd_14)-6); //设置校验码
-                            coms.isend_len=strlen(hart_cmd_14);
+                            coms.send_buf[13]=Hart_CmdCheckCode(coms.send_buf+5,sizeof(hart_cmd_14)-6); //设置校验码
+                            coms.isend_len=sizeof(hart_cmd_14);
                             if(hart_debug_mode)
                             {
-                                syslog(LOG_DEBUG,"[DEBUG][HartGW][CMD14]Cmds=%d,ID=%d,%d,%d,CheckCode=%d",
-                                    i,coms.send_buf[8],coms.send_buf[9],coms.send_buf[10],coms.send_buf[13]);
+                                syslog(LOG_DEBUG,"[DEBUG][HartGW][SEND_CMD=14][%s]Index=%d#,ID=0x%02X,0x%02X,0x%02X,CheckCode=0x%02X,len=%d",
+                                    coms.sPortName,i+1,coms.send_buf[8],coms.send_buf[9],coms.send_buf[10],coms.send_buf[13],coms.isend_len);
                             }
                             break;
                         case 15:
-                            memcpy(coms.send_buf,hart_cmd_15,strlen(hart_cmd_15));                      //设置命令内容
+                            memcpy(coms.send_buf,hart_cmd_15,sizeof(hart_cmd_15));                      //设置命令内容
                             coms.send_buf[6]=HT.HTCmds[i].bID[0];                                       //设置该设备的Hart ID
                             coms.send_buf[7]=HT.HTCmds[i].bID[1];
                             coms.send_buf[8]=HT.HTCmds[i].bID[2];
                             coms.send_buf[9]=HT.HTCmds[i].bID[3];
                             coms.send_buf[10]=HT.HTCmds[i].bID[4];
-                            coms.send_buf[13]=Hart_CmdCheckCode(coms.send_buf+5,strlen(hart_cmd_15)-6); //设置校验码
-                            coms.isend_len=strlen(hart_cmd_15);
+                            coms.send_buf[13]=Hart_CmdCheckCode(coms.send_buf+5,sizeof(hart_cmd_15)-6); //设置校验码
+                            coms.isend_len=sizeof(hart_cmd_15);
                             if(hart_debug_mode)
                             {
-                                syslog(LOG_DEBUG,"[DEBUG][HartGW][CMD15]Cmds=%d,ID=%d,%d,%d,CheckCode=%d",
-                                    i,coms.send_buf[8],coms.send_buf[9],coms.send_buf[10],coms.send_buf[13]);
+                                syslog(LOG_DEBUG,"[DEBUG][HartGW][SEND_CMD=15][%s]Index=%d#,ID=0x%02X,0x%02X,0x%02X,CheckCode=0x%02X,len=%d",
+                                    coms.sPortName,i+1,coms.send_buf[8],coms.send_buf[9],coms.send_buf[10],coms.send_buf[13],coms.isend_len);
                             }
                             break;
                         case 16: 
-                            memcpy(coms.send_buf,hart_cmd_16,strlen(hart_cmd_16));                      //设置命令内容
+                            memcpy(coms.send_buf,hart_cmd_16,sizeof(hart_cmd_16));                      //设置命令内容
                             coms.send_buf[6]=HT.HTCmds[i].bID[0];                                       //设置该设备的Hart ID
                             coms.send_buf[7]=HT.HTCmds[i].bID[1];
                             coms.send_buf[8]=HT.HTCmds[i].bID[2];
                             coms.send_buf[9]=HT.HTCmds[i].bID[3];
                             coms.send_buf[10]=HT.HTCmds[i].bID[4];
-                            coms.send_buf[13]=Hart_CmdCheckCode(coms.send_buf+5,strlen(hart_cmd_16)-6); //设置校验码
-                            coms.isend_len=strlen(hart_cmd_16);
+                            coms.send_buf[13]=Hart_CmdCheckCode(coms.send_buf+5,sizeof(hart_cmd_16)-6); //设置校验码
+                            coms.isend_len=sizeof(hart_cmd_16);
                             if(hart_debug_mode)
                             {
-                                syslog(LOG_DEBUG,"[DEBUG][HartGW][CMD16]Cmds=%d,ID=%d,%d,%d,CheckCode=%d",
-                                    i,coms.send_buf[8],coms.send_buf[9],coms.send_buf[10],coms.send_buf[13]);
+                                syslog(LOG_DEBUG,"[DEBUG][HartGW][SEND_CMD=16][%s]Index=%d#,ID=0x%02X,0x%02X,0x%02X,CheckCode=0x%02X,len=%d",
+                                    coms.sPortName,i+1,coms.send_buf[8],coms.send_buf[9],coms.send_buf[10],coms.send_buf[13],coms.isend_len);
                             } 
                             break;              
                     }
@@ -326,6 +328,7 @@ unsigned int Hart_ComDO()
     unsigned char cc;
     unsigned int mapaddress;                    //已经发出的命令中的映射到modnet的地址
     int i,m,n; 
+    char s1[]="0x00,",s2[200];
  
     if(hart_recv_len)     //有接受的数据需要处理
     {
@@ -353,7 +356,7 @@ unsigned int Hart_ComDO()
         }
         if(n==0)                                                //没有找到命令头
         {
-            syslog(LOG_DEBUG,"[ERR][HartGW][%s]No Head!",coms.sPortName);
+            syslog(LOG_DEBUG,"[ERR][HartGW][RECV][%s]Index=%d#,No Head!",coms.sPortName,HT.iSendedIndex+1);
             hart_recv_len=0;
             memset(hart_recv_buf,0,sizeof(hart_recv_buf));
             HT.iIntervalCount=HT.iInterval;                     //设置下一条命令发送的延迟时间
@@ -363,7 +366,7 @@ unsigned int Hart_ComDO()
         //处理前导(0xff)头完成
         if(hart_recv_len<8)                                     // 返回的命令太短
         {
-            syslog(LOG_DEBUG,"[ERR][HartGW][%s]back too short!",coms.sPortName);
+            syslog(LOG_DEBUG,"[ERR][HartGW][RECV][%s]Index=%d#,back too short!",coms.sPortName,HT.iSendedIndex+1);
             hart_recv_len=0;
             memset(hart_recv_buf,0,sizeof(hart_recv_buf));
             HT.iIntervalCount=HT.iInterval;                     //设置下一条命令发送的延迟时间
@@ -388,8 +391,14 @@ unsigned int Hart_ComDO()
         cc=Hart_CmdCheckCode(hart_recv_buf,hart_recv_len-1);    //计算收到命令的checkcode值
         if(in_cc!=cc)                                           //校验是否正确
         {
-            syslog(LOG_DEBUG,"[ERR][HartGW][%s]CheckCode Err!(No.=%d,len=%d,0x%02X,0x%02X)",
-                    coms.sPortName,HT.iSendedIndex+1,hart_recv_len,in_cc,cc);
+            syslog(LOG_DEBUG,"[ERR][HartGW][RECV][%s]Index=%d#,CheckCode Err!(len=%d,head=0x%02X,0x%02X,0x%02X,CheckCode=0x%02X,0x%02X)",
+                    coms.sPortName,HT.iSendedIndex+1,hart_recv_len,hart_recv_buf[0],hart_recv_buf[1],hart_recv_buf[2],in_cc,cc);
+            memset(s2,0,sizeof(s2));
+            for(i=0;i<hart_recv_len;i++)
+            {
+                sprintf(s2+i*5,"0x%02X,",hart_recv_buf[i]);
+            }
+            syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV]%s",s2);
             hart_recv_len=0;
             memset(hart_recv_buf,0,sizeof(hart_recv_buf));
             HT.iIntervalCount=HT.iInterval;                     //设置下一条命令发送的延迟时间
@@ -401,7 +410,7 @@ unsigned int Hart_ComDO()
         {
             if(hart_debug_mode)
             {
-                syslog(LOG_DEBUG,"[DEBUG][HartGW][%s]Respon not for me!");
+                syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV][%s]Index=%d#,Respon not for me!",coms.sPortName,HT.iSendedIndex+1);
             }
             hart_recv_len=0;
             memset(hart_recv_buf,0,sizeof(hart_recv_buf));
@@ -414,7 +423,7 @@ unsigned int Hart_ComDO()
         {
             if(hart_debug_mode)
             {
-                syslog(LOG_DEBUG,"[DEBUG][HartGW][%s]Respon for Burset mode!");
+                syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV][%s]Index=%d#,Respon for Burset mode!",coms.sPortName,HT.iSendedIndex+1);
             }
             hart_recv_len=0;
             memset(hart_recv_buf,0,sizeof(hart_recv_buf));
@@ -425,7 +434,8 @@ unsigned int Hart_ComDO()
 
         if((id[0]!=in_id[0])||(id[1]!=in_id[1])||(id[2]!=in_id[2])||(id[3]!=in_id[3])||(id[4]!=in_id[4]))     // Hart ID不符
         {
-            syslog(LOG_DEBUG,"[ERR][HartGW][%s]Hart ID Err!(No.=%d)",coms.sPortName,HT.iSendedIndex);
+            syslog(LOG_DEBUG,"[ERR][HartGW][RECV][%s]Index=%d#,Hart ID Err!(0x%02X,0x%02X,0x%02X)(0x%02X,0x%02X,0x%02X)",
+                    coms.sPortName,HT.iSendedIndex+1,id[2],id[3],id[4],in_id[2],in_id[3],in_id[4]);
             hart_recv_len=0;
             memset(hart_recv_buf,0,sizeof(hart_recv_buf));
             HT.iIntervalCount=HT.iInterval;                     //设置下一条命令发送的延迟时间
@@ -435,7 +445,7 @@ unsigned int Hart_ComDO()
 
         if(cmd!=in_cmd)                                         // Hart命令号不符
         {
-            syslog(LOG_DEBUG,"[ERR][HartGW][%s]Hart command Err!(No.=%d,%d,%d)",coms.sPortName,HT.iSendedIndex,cmd,in_cmd);
+            syslog(LOG_DEBUG,"[ERR][HartGW][RECV][%s]Index=%d#,Hart command Err!(%d,%d)",coms.sPortName,HT.iSendedIndex+1,cmd,in_cmd);
             hart_recv_len=0;
             memset(hart_recv_buf,0,sizeof(hart_recv_buf));
             HT.iIntervalCount=HT.iInterval;                     //设置下一条命令发送的延迟时间
@@ -445,29 +455,29 @@ unsigned int Hart_ComDO()
 
         switch(cmd)
         {
-            case 1:                                                           //读取PV值,需要5个reg
+            case 1:                                                           //读取PV单位(1Byte)和值(浮点,4Byte),需要5个reg
                 semaphore_p(sem_mb_inputreg_id);                              //进入临界区
                     modnet_inputreg_buf[mapaddress]=hart_recv_buf[8]*0x100+hart_recv_buf[9];        //保存响应码
-                    modnet_inputreg_buf[mapaddress+1]=hart_recv_buf[10]*0x100+hart_recv_buf[11];    //PV的电流,浮点4Byte
-                    modnet_inputreg_buf[mapaddress+2]=hart_recv_buf[12]*0x100+hart_recv_buf[13];    
-                    modnet_inputreg_buf[mapaddress+3]=hart_recv_buf[14]*0x100+hart_recv_buf[15];    //PV值,浮点4Byte
-                    modnet_inputreg_buf[mapaddress+4]=hart_recv_buf[16]*0x100+hart_recv_buf[17];
+                    modnet_inputreg_buf[mapaddress+1]=hart_recv_buf[10];     //PV的单位
+                    modnet_inputreg_buf[mapaddress+2]=hart_recv_buf[11]*0x100+hart_recv_buf[12];    //PV值,浮点4Byte
+                    modnet_inputreg_buf[mapaddress+3]=hart_recv_buf[13]*0x100+hart_recv_buf[14];
                 semaphore_v(sem_mb_inputreg_id);                              //退出临界区
                 if(hart_debug_mode)
                 {
-                    syslog(LOG_DEBUG,"[DEBUG][HartGW][%s][RECV_CMD=1]",coms.sPortName);
+                    syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV_CMD=1][%s]Write to InputReg=%d",coms.sPortName,mapaddress+1);
                 }               
                 break;
             case 2:                                                          //读取PV电流和百分比,需要4个Reg
                 semaphore_p(sem_mb_inputreg_id);                             //进入临界区
                     modnet_inputreg_buf[mapaddress]=hart_recv_buf[8]*0x100+hart_recv_buf[9];        //保存响应码
-                    modnet_inputreg_buf[mapaddress+1]=hart_recv_buf[10];     //PV的单位
-                    modnet_inputreg_buf[mapaddress+2]=hart_recv_buf[11]*0x100+hart_recv_buf[12];    //PV值,浮点4Byte
-                    modnet_inputreg_buf[mapaddress+3]=hart_recv_buf[13]*0x100+hart_recv_buf[14];
+                    modnet_inputreg_buf[mapaddress+1]=hart_recv_buf[10]*0x100+hart_recv_buf[11];    //PV的电流,浮点4Byte
+                    modnet_inputreg_buf[mapaddress+2]=hart_recv_buf[12]*0x100+hart_recv_buf[13];    
+                    modnet_inputreg_buf[mapaddress+3]=hart_recv_buf[14]*0x100+hart_recv_buf[15];    //PV值,浮点4Byte
+                    modnet_inputreg_buf[mapaddress+4]=hart_recv_buf[16]*0x100+hart_recv_buf[17];
                 semaphore_v(sem_mb_inputreg_id);                             //退出临界区 
                 if(hart_debug_mode)
                 {
-                    syslog(LOG_DEBUG,"[DEBUG][HartGW][%s][RECV_CMD=2]",coms.sPortName);
+                    syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV_CMD=2][%s]Write to InputReg=%d",coms.sPortName,mapaddress+1);
                 }
                 break;
             case 12:                                                         //读message,24Byte
@@ -479,7 +489,7 @@ unsigned int Hart_ComDO()
                 semaphore_v(sem_mb_inputreg_id);                             //退出临界区
                 if(hart_debug_mode)
                 {
-                    syslog(LOG_DEBUG,"[DEBUG][HartGW][%s][RECV_CMD=12]",coms.sPortName);
+                    syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV_CMD=12][%s]Write to InputReg=%d",coms.sPortName,mapaddress+1);
                 }
                 break;
             case 13:                                                         //读取标签(6Byte),描述符(12Byte),日期(3Byte)
@@ -488,12 +498,12 @@ unsigned int Hart_ComDO()
                     {
                         modnet_inputreg_buf[mapaddress+i]=hart_recv_buf[i*2+8]*0x100+hart_recv_buf[i*2+9];
                     }                                                            
-                    modnet_inputreg_buf[mapaddress+10]=hart_recv_buf[28];                           //保存日期-年
-                    modnet_inputreg_buf[mapaddress+11]=hart_recv_buf[29]*0x100+hart_recv_buf[30];   //保存日期-月,日
+                    modnet_inputreg_buf[mapaddress+10]=hart_recv_buf[28]*0x100+hart_recv_buf[29];   //保存日期-日,月
+                    modnet_inputreg_buf[mapaddress+11]=hart_recv_buf[30];                           //保存日期-年
                 semaphore_v(sem_mb_inputreg_id);                             //退出临界区
                 if(hart_debug_mode)
                 {
-                    syslog(LOG_DEBUG,"[DEBUG][HartGW][%s][RECV_CMD=13]",coms.sPortName);
+                    syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV_CMD=13][%s]Write to InputReg=%d",coms.sPortName,mapaddress+1);
                 }
                 break;
             case 14:                                                            //读PV传感器序列号,上下限,单位精度代码,需要10个Reg
@@ -511,7 +521,7 @@ unsigned int Hart_ComDO()
                 semaphore_v(sem_mb_inputreg_id);                             //退出临界区
                 if(hart_debug_mode)
                 {
-                    syslog(LOG_DEBUG,"[DEBUG][HartGW][%s][RECV_CMD=14]",coms.sPortName);
+                    syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV_CMD=14][%s]Write to InputReg=%d",coms.sPortName,mapaddress+1);
                 }
                 break;
             case 15:                                                            //报警选择代码1Byte,功能代码1Byte,量程单位代码1Byte,
@@ -534,7 +544,7 @@ unsigned int Hart_ComDO()
                 semaphore_v(sem_mb_inputreg_id);                                    //退出临界区
                 if(hart_debug_mode)
                 {
-                    syslog(LOG_DEBUG,"[DEBUG][HartGW][%s][RECV_CMD=15]",coms.sPortName);
+                    syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV_CMD=15][%s]Write to InputReg=%d",coms.sPortName,mapaddress+1);
                 }
                 break;
             case 16:                                                             //读取最终装配号3Byte,需要3Reg
@@ -545,7 +555,7 @@ unsigned int Hart_ComDO()
                 semaphore_v(sem_mb_inputreg_id);                                //退出临界区
                 if(hart_debug_mode)
                 {
-                    syslog(LOG_DEBUG,"[DEBUG][HartGW][%s][RECV_CMD=16]",coms.sPortName);
+                    syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV_CMD=16][%s]Write to InputReg=%d",coms.sPortName,mapaddress+1);
                 }
                 break;
         }
@@ -563,15 +573,15 @@ void Hart_ComStatus()
     int i;
 
     semaphore_p(sem_mb_inputreg_id);        //进入临界区
-    for(i=0;i<HART_CMDS_NUM_MAX;i++)   //遍历每一条命令
-    {
-        if(HT.HTCmds[i].iEn)
+        for(i=0;i<HART_CMDS_NUM_MAX;i++)   //遍历每一条命令
         {
-            modnet_inputreg_buf[hart_run_status_reg+10+i*3]=HT.HTCmds[i].iSuccCount;       //通讯成功的次数
-            modnet_inputreg_buf[hart_run_status_reg+10+i*3+1]=HT.HTCmds[i].iFailedCount;   //通讯失败的次数
-            modnet_inputreg_buf[hart_run_status_reg+10+i*3+2]=HT.HTCmds[i].iTimeoutCount;  //通讯超时的次数
+            if(HT.HTCmds[i].iEn)
+            {
+                modnet_inputreg_buf[hart_run_status_reg+10+i*3]=HT.HTCmds[i].iSuccCount;       //通讯成功的次数
+                modnet_inputreg_buf[hart_run_status_reg+10+i*3+1]=HT.HTCmds[i].iFailedCount;   //通讯失败的次数
+                modnet_inputreg_buf[hart_run_status_reg+10+i*3+2]=HT.HTCmds[i].iTimeoutCount;  //通讯超时的次数
+            }
         }
-    }
     semaphore_v(sem_mb_inputreg_id);        //退出临界区
 }
 
@@ -619,8 +629,8 @@ int main(int argc, char **argv)
         //如果有需要就将通讯状态写入到Modnet input reg中,如果hart_run_status_reg=0就不写入
         if(hart_run_status_reg)
             Hart_ComStatus();
-        //延迟1ms,然后进行下一次处理,经过测试证明usleep(1)暂停的时间是5us
-        usleep(200);
+        //延迟5ms,然后进行下一次处理,经过测试证明usleep给出的参数<5000延迟5ms,5000-10000延迟10ms
+        usleep(1000);
     }
     // 关闭串口 
     UART_Close();           

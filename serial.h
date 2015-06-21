@@ -355,7 +355,7 @@ int UART_ComDO()
             {
                 //处理已经收到的数据，并准备接受下一帧数据
                 if(com_debug_mode)
-                    syslog(LOG_DEBUG,"[DEBUG][Serail][%s]RECV]%d Byte",coms.sPortName,coms.irecv_len);
+                    syslog(LOG_DEBUG,"[DEBUG][Serail][%s][RECV]%d Byte",coms.sPortName,coms.irecv_len);
                 memcpy(hart_recv_buf,coms.recv_buf,coms.irecv_len);    //复制接的数据帧到Hart接受命令缓存
                 hart_recv_len=coms.irecv_len;
                 //初始化接受缓存,准备接受下一帧数据

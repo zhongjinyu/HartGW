@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <Setting>
-	<Port>/dev/ttySAC0</Port>
+	<Port>/dev/ttySAC3</Port>
 	<Baud>57600</Baud>
 	<Interval>20</Interval>
 	<RunStatusReg>25051</RunStatusReg>
-	<Debug_Mode>0</Debug_Mode>
+	<Debug_Mode>1</Debug_Mode>
 	<Com_Debug_Mode>0</Com_Debug_Mode>
 	<Com_Test_Mode>0</Com_Test_Mode>
-	<Com_Time_Out>400</Com_Time_Out>
+	<Com_Time_Out>2000</Com_Time_Out>
 </Setting>
 <hart index="1">
 	<cmd_enable>1</cmd_enable>
-	<hart_id>0x12,0x34,0x56</hart_id>
+	<hart_id>0xA6,0x06,0x23,0x51,0x83</hart_id>
 	<hart_cmd_no>1</hart_cmd_no>
 	<modnet_map_address>100</modnet_map_address>
 	<hart_device_type>1</hart_device_type>
@@ -20,73 +20,73 @@
 </hart>
 <hart index="2">
 	<cmd_enable>1</cmd_enable>
-	<hart_id>0x11,0x22,0x33</hart_id>
-	<hart_cmd_no>2</hart_cmd_no>
-	<modnet_map_address>100</modnet_map_address>
+	<hart_id>0xA6,0x06,0x23,0x51,0x83</hart_id>
+	<hart_cmd_no>14</hart_cmd_no>
+	<modnet_map_address>200</modnet_map_address>
 	<hart_device_type>1</hart_device_type>
 	<hart_hub_port>2</hart_hub_port>
 </hart>
 <hart index="3">
 	<cmd_enable>1</cmd_enable>
-	<hart_id>0xaa,0xbb,0xcc</hart_id>
-	<hart_cmd_no>12</hart_cmd_no>
-	<modnet_map_address>100</modnet_map_address>
+	<hart_id>0xA6,0x06,0x23,0x51,0x83</hart_id>
+	<hart_cmd_no>15</hart_cmd_no>
+	<modnet_map_address>300</modnet_map_address>
 	<hart_device_type>1</hart_device_type>
 	<hart_hub_port>3</hart_hub_port>
 </hart>
 <hart index="4">
 	<cmd_enable>1</cmd_enable>
-	<hart_id>0x11,0x22,0x33</hart_id>
-	<hart_cmd_no>13</hart_cmd_no>
-	<modnet_map_address>100</modnet_map_address>
+	<hart_id>0xA6,0x06,0x23,0x51,0x83</hart_id>
+	<hart_cmd_no>16</hart_cmd_no>
+	<modnet_map_address>400</modnet_map_address>
 	<hart_device_type>1</hart_device_type>
 	<hart_hub_port>4</hart_hub_port>
 </hart>
 <hart index="5">
 	<cmd_enable>0</cmd_enable>
-	<hart_id>0x22,0x33,0x44</hart_id>
+	<hart_id>0xA6,0x06,0x22,0x33,0x44</hart_id>
 	<hart_cmd_no>4</hart_cmd_no>
-	<modnet_map_address>100</modnet_map_address>
+	<modnet_map_address>500</modnet_map_address>
 	<hart_device_type>1</hart_device_type>
 	<hart_hub_port>5</hart_hub_port>
 </hart>
 <hart index="6">
 	<cmd_enable>0</cmd_enable>
-	<hart_id>0x33,0x44,0x55</hart_id>
+	<hart_id>0xA6,0x06,0x33,0x44,0x55</hart_id>
 	<hart_cmd_no>4</hart_cmd_no>
-	<modnet_map_address>100</modnet_map_address>
+	<modnet_map_address>600</modnet_map_address>
 	<hart_device_type>1</hart_device_type>
 	<hart_hub_port>6</hart_hub_port>
 </hart>
 <hart index="7">
 	<cmd_enable>0</cmd_enable>
-	<hart_id>0x44,0x55,0x66</hart_id>
+	<hart_id>0xA6,0x06,0x44,0x55,0x66</hart_id>
 	<hart_cmd_no>4</hart_cmd_no>
-	<modnet_map_address>100</modnet_map_address>
+	<modnet_map_address>700</modnet_map_address>
 	<hart_device_type>1</hart_device_type>
 	<hart_hub_port>7</hart_hub_port>
 </hart>
 <hart index="8">
 	<cmd_enable>0</cmd_enable>
-	<hart_id>0x55,0x66,0x77</hart_id>
+	<hart_id>0xA6,0x06,0x55,0x66,0x77</hart_id>
 	<hart_cmd_no>4</hart_cmd_no>
-	<modnet_map_address>100</modnet_map_address>
+	<modnet_map_address>800</modnet_map_address>
 	<hart_device_type>1</hart_device_type>
 	<hart_hub_port>8</hart_hub_port>
 </hart>
 <hart index="9">
 	<cmd_enable>0</cmd_enable>
-	<hart_id>0x66,0x77,0x88</hart_id>
+	<hart_id>0xA6,0x06,0x66,0x77,0x88</hart_id>
 	<hart_cmd_no>4</hart_cmd_no>
-	<modnet_map_address>100</modnet_map_address>
+	<modnet_map_address>900</modnet_map_address>
 	<hart_device_type>1</hart_device_type>
 	<hart_hub_port>9</hart_hub_port>
 </hart>
 <hart index="10">
 	<cmd_enable>0</cmd_enable>
-	<hart_id>0x77,0x88,0x99</hart_id>
+	<hart_id>0xA6,0x06,0x77,0x88,0x99</hart_id>
 	<hart_cmd_no>4</hart_cmd_no>
-	<modnet_map_address>100</modnet_map_address>
+	<modnet_map_address>1000</modnet_map_address>
 	<hart_device_type>1</hart_device_type>
 	<hart_hub_port>10</hart_hub_port>
 </hart>
