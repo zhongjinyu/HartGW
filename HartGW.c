@@ -373,6 +373,7 @@ unsigned int Hart_ComDO()
             HT.HTCmds[HT.iSendedIndex].iFailedCount++;          //该条命令通讯失败次数+1
             return 1;
         }        
+        hart_recv_len=hart_recv_buf[7]+9;                       //根据收到命令的数据长度来修正收到命令的长度,如果有多余的字节被抛弃
         id[0]=HT.HTCmds[HT.iSendedIndex].bID[0];                //取得已经发出的命令的ID号
         id[1]=HT.HTCmds[HT.iSendedIndex].bID[1];
         id[2]=HT.HTCmds[HT.iSendedIndex].bID[2];
