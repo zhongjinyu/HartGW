@@ -2,7 +2,7 @@
 
 <Setting>
 	<Port>/dev/ttySAC3</Port>
-	<Baud>57600</Baud>
+	<Baud>19200</Baud>
 	<Interval>20</Interval>
 	<RunStatusReg>25051</RunStatusReg>
 	<Debug_Mode>1</Debug_Mode>
@@ -12,7 +12,7 @@
 </Setting>
 <hart index="1">
 	<cmd_enable>1</cmd_enable>
-	<hart_id>0xA6,0x06,0x23,0x51,0x83</hart_id>
+	<hart_id>0xA6,0x1D,0x44,0x0D,0x8D</hart_id>
 	<hart_cmd_no>1</hart_cmd_no>
 	<modnet_map_address>100</modnet_map_address>
 	<hart_device_type>1</hart_device_type>
@@ -20,23 +20,24 @@
 </hart>
 <hart index="2">
 	<cmd_enable>1</cmd_enable>
-	<hart_id>0xA6,0x06,0x23,0x51,0x83</hart_id>
-	<hart_cmd_no>14</hart_cmd_no>
+	<hart_id>0xA6,0x1D,0x44,0x0D,0x8D</hart_id>
+	<hart_cmd_no>13</hart_cmd_no>
 	<modnet_map_address>200</modnet_map_address>
 	<hart_device_type>1</hart_device_type>
 	<hart_hub_port>2</hart_hub_port>
 </hart>
 <hart index="3">
 	<cmd_enable>1</cmd_enable>
-	<hart_id>0xA6,0x06,0x23,0x51,0x83</hart_id>
-	<hart_cmd_no>15</hart_cmd_no>
+	<hart_id>0xA6,0x1D,0x44,0x0D,0x8D</hart_id>
+	<hart_tag>0xCB,0x7D,0xF0,0xCB,0x7E,0x60</hart_tag>
+	<hart_cmd_no>11</hart_cmd_no>
 	<modnet_map_address>300</modnet_map_address>
 	<hart_device_type>1</hart_device_type>
 	<hart_hub_port>3</hart_hub_port>
 </hart>
 <hart index="4">
 	<cmd_enable>1</cmd_enable>
-	<hart_id>0xA6,0x06,0x23,0x51,0x83</hart_id>
+	<hart_id>0xA6,0x1D,0x44,0x0D,0x8D</hart_id>
 	<hart_cmd_no>16</hart_cmd_no>
 	<modnet_map_address>400</modnet_map_address>
 	<hart_device_type>1</hart_device_type>

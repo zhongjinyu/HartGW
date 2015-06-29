@@ -6,11 +6,12 @@
     FILE *fp;
     mxml_node_t *xml_tree;
     mxml_node_t *hart,*node;
-    int i,t1,t2,t3,t4,t5;
+    int i,t1,t2,t3,t4,t5,t6;
     char filename[50]="//zqkj//config//";
 
     memset(hart_recv_buf,0,sizeof(hart_recv_buf));  //清空接受缓存
     memset(&HT,0,sizeof(HT));                       //初始化HT结构
+    memset(&HD,0,sizeof(HD));                       //初始化HD结构
 
     HT.iCmdIndex=0;
     HT.iSendedIndex=0;
@@ -99,6 +100,18 @@
                     HT.HTCmds[i].bID[3]=t4;
                     HT.HTCmds[i].bID[4]=t5;
 
+                } 
+                node=mxmlFindElement(hart,hart,"hart_tag",NULL,NULL,MXML_DESCEND);
+                if(node!=NULL)
+                {
+                    //读取Hart ID
+                    sscanf(node->child->value.text.string,"%X,%X,%X,%X,%X,%X",&t1,&t2,&t3,&t4,&t5,&t6);
+                    HT.HTCmds[i].bTag[0]=t1;
+                    HT.HTCmds[i].bTag[1]=t2;
+                    HT.HTCmds[i].bTag[2]=t3;
+                    HT.HTCmds[i].bTag[3]=t4;
+                    HT.HTCmds[i].bTag[4]=t5;
+                    HT.HTCmds[i].bTag[5]=t6;
                 } 
                 node=mxmlFindElement(hart,hart,"hart_cmd_no",NULL,NULL,MXML_DESCEND);
                 if(node!=NULL)
@@ -210,7 +223,30 @@ unsigned int Hart_Send()
                                 syslog(LOG_DEBUG,"[DEBUG][HartGW][SEND_CMD=2][%s]Index=%d#,ID=0x%02X,0x%02X,0x%02X,CheckCode=0x%02X,len=%d",
                                     coms.sPortName,i+1,coms.send_buf[8],coms.send_buf[9],coms.send_buf[10],coms.send_buf[13],coms.isend_len);
                             } 
-                            break;                      
+                            break;
+                        case 11:
+                            memcpy(coms.send_buf,hart_cmd_11,sizeof(hart_cmd_11));                      //设置命令内容
+                            coms.send_buf[6]=HT.HTCmds[i].bID[0];                                       //设置该设备的Hart ID
+                            coms.send_buf[7]=HT.HTCmds[i].bID[1];
+                            coms.send_buf[8]=HT.HTCmds[i].bID[2];
+                            coms.send_buf[9]=HT.HTCmds[i].bID[3];
+                            coms.send_buf[10]=HT.HTCmds[i].bID[4];
+                            coms.send_buf[13]=HT.HTCmds[i].bTag[0];										//设置改设备的Tag
+                            coms.send_buf[14]=HT.HTCmds[i].bTag[1];
+                            coms.send_buf[15]=HT.HTCmds[i].bTag[2];
+                            coms.send_buf[16]=HT.HTCmds[i].bTag[3];
+                            coms.send_buf[17]=HT.HTCmds[i].bTag[4];
+                            coms.send_buf[18]=HT.HTCmds[i].bTag[5];
+                            coms.send_buf[19]=Hart_CmdCheckCode(coms.send_buf+5,sizeof(hart_cmd_11)-6); //设置校验码
+                            coms.isend_len=sizeof(hart_cmd_11);
+                            if(hart_debug_mode)
+                            {
+                                syslog(LOG_DEBUG,"[DEBUG][HartGW][SEND_CMD=11][%s]Index=%d#,ID=0x%02X,0x%02X,0x%02X,CheckCode=0x%02X,len=%d",
+                                    coms.sPortName,i+1,coms.send_buf[8],coms.send_buf[9],coms.send_buf[10],coms.send_buf[13],coms.isend_len);
+                                syslog(LOG_DEBUG,"[DEBUG][HartGW][SEND_CMD=11][%s]Index=%d#,Tag=0x%02X,0x%02X,0x%02X,0x%02X,0x%02X,0x%02X",
+                                	coms.sPortName,i+1,coms.send_buf[13],coms.send_buf[14],coms.send_buf[15],coms.send_buf[16],coms.send_buf[17],coms.send_buf[18]);
+                            }
+                            break;                    
                         case 12:
                             memcpy(coms.send_buf,hart_cmd_12,sizeof(hart_cmd_12));                      //设置命令内容
                             coms.send_buf[6]=HT.HTCmds[i].bID[0];                                       //设置该设备的Hart ID
@@ -459,33 +495,65 @@ unsigned int Hart_ComDO()
             case 1:                                                           //读取PV单位(1Byte)和值(浮点,4Byte),需要5个reg
                 semaphore_p(sem_mb_inputreg_id);                              //进入临界区
                     modnet_inputreg_buf[mapaddress]=hart_recv_buf[8]*0x100+hart_recv_buf[9];        //保存响应码
-                    modnet_inputreg_buf[mapaddress+1]=hart_recv_buf[10];     //PV的单位
-                    modnet_inputreg_buf[mapaddress+2]=hart_recv_buf[11]*0x100+hart_recv_buf[12];    //PV值,浮点4Byte
-                    modnet_inputreg_buf[mapaddress+3]=hart_recv_buf[13]*0x100+hart_recv_buf[14];
+                    modnet_inputreg_buf[mapaddress+1]=in_len;                //保存返回命令的数据长度
+                    modnet_inputreg_buf[mapaddress+2]=hart_recv_buf[10];     //PV的单位
+                    modnet_inputreg_buf[mapaddress+3]=hart_recv_buf[11]*0x100+hart_recv_buf[12];    //PV值,浮点4Byte
+                    modnet_inputreg_buf[mapaddress+4]=hart_recv_buf[13]*0x100+hart_recv_buf[14];
                 semaphore_v(sem_mb_inputreg_id);                              //退出临界区
                 if(hart_debug_mode)
                 {
                     syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV_CMD=1][%s]Write to InputReg=%d",coms.sPortName,mapaddress+1);
                 }               
                 break;
-            case 2:                                                          //读取PV电流和百分比,需要4个Reg
+            case 2:                                                          //读取PV电流和百分比,需要6个Reg
                 semaphore_p(sem_mb_inputreg_id);                             //进入临界区
                     modnet_inputreg_buf[mapaddress]=hart_recv_buf[8]*0x100+hart_recv_buf[9];        //保存响应码
-                    modnet_inputreg_buf[mapaddress+1]=hart_recv_buf[10]*0x100+hart_recv_buf[11];    //PV的电流,浮点4Byte
-                    modnet_inputreg_buf[mapaddress+2]=hart_recv_buf[12]*0x100+hart_recv_buf[13];    
-                    modnet_inputreg_buf[mapaddress+3]=hart_recv_buf[14]*0x100+hart_recv_buf[15];    //PV值,浮点4Byte
-                    modnet_inputreg_buf[mapaddress+4]=hart_recv_buf[16]*0x100+hart_recv_buf[17];
+                    modnet_inputreg_buf[mapaddress+1]=in_len;                //保存返回命令的数据长度
+                    modnet_inputreg_buf[mapaddress+2]=hart_recv_buf[10]*0x100+hart_recv_buf[11];    //PV的电流,浮点4Byte
+                    modnet_inputreg_buf[mapaddress+3]=hart_recv_buf[12]*0x100+hart_recv_buf[13];    
+                    modnet_inputreg_buf[mapaddress+4]=hart_recv_buf[14]*0x100+hart_recv_buf[15];    //PV值,浮点4Byte
+                    modnet_inputreg_buf[mapaddress+5]=hart_recv_buf[16]*0x100+hart_recv_buf[17];
                 semaphore_v(sem_mb_inputreg_id);                             //退出临界区 
                 if(hart_debug_mode)
                 {
                     syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV_CMD=2][%s]Write to InputReg=%d",coms.sPortName,mapaddress+1);
                 }
                 break;
-            case 12:                                                         //读message,24Byte
+            case 11:                                                        //通过设备Tag读取制造商ID(1Byte),设备类型(1Byte),请求的前导符个数(1Byte)
+            																//Hart版本(1Byte),设备版本(1Byte),设备软件版本(1Byte),设备硬件版本(1Byte)
+            																//设备标志(1Byte),设备ID号(3Byte),响应的最小前导符个数(1Byte),
+                                                                            //设备变量的最大个数(1Byte),配置修改次数(2Byte),附加设备状态(1Byte),
+                                                                            //需要16reg
+                semaphore_p(sem_mb_inputreg_id);                            //进入临界区
+                    modnet_inputreg_buf[mapaddress]=hart_recv_buf[8]*0x100+hart_recv_buf[9];        //保存响应码
+                    modnet_inputreg_buf[mapaddress+1]=in_len;               //保存返回命令的数据长度
+                    modnet_inputreg_buf[mapaddress+2]=hart_recv_buf[11];    //制造商ID,1Byte
+                    modnet_inputreg_buf[mapaddress+3]=hart_recv_buf[12];	//设备类型(1Byte) 
+                    modnet_inputreg_buf[mapaddress+4]=hart_recv_buf[13];    //请求的前导符个数(1Byte)
+                    modnet_inputreg_buf[mapaddress+5]=hart_recv_buf[14];	//Hart版本(1Byte)
+                    modnet_inputreg_buf[mapaddress+6]=hart_recv_buf[15];	//设备版本(1Byte)
+                    modnet_inputreg_buf[mapaddress+7]=hart_recv_buf[16];	//设备软件版本(1Byte)
+                    modnet_inputreg_buf[mapaddress+8]=hart_recv_buf[17];	//设备硬件版本(1Byte)
+                    modnet_inputreg_buf[mapaddress+9]=hart_recv_buf[18];	//设备标志(1Byte)
+                    modnet_inputreg_buf[mapaddress+10]=hart_recv_buf[19];	//设备ID号(3Byte)
+                    modnet_inputreg_buf[mapaddress+11]=hart_recv_buf[20]*0x100+hart_recv_buf[21]; 
+                    modnet_inputreg_buf[mapaddress+12]=hart_recv_buf[22];   //响应的最小前导符个数
+                    modnet_inputreg_buf[mapaddress+13]=hart_recv_buf[23];   //设备变量的最大个数
+                    modnet_inputreg_buf[mapaddress+14]=hart_recv_buf[24]*0x100+hart_recv_buf[25];   //配置修改次数
+                    modnet_inputreg_buf[mapaddress+15]=hart_recv_buf[26];   //附加设备状态              
+                semaphore_v(sem_mb_inputreg_id);                            //退出临界区 
+                if(hart_debug_mode)
+                {
+                    syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV_CMD=11][%s]Write to InputReg=%d",coms.sPortName,mapaddress+1);
+                }
+                break;
+            case 12:                                                         //读message,24Byte,需要14reg
                 semaphore_p(sem_mb_inputreg_id);                             //进入临界区
-                    for(i=0;i<13;i++)                                        //需要13个reg, 响应码1个,message 12个
+                    modnet_inputreg_buf[mapaddress]=hart_recv_buf[8]*0x100+hart_recv_buf[9];        //保存响应码
+                    modnet_inputreg_buf[mapaddress+1]=in_len;                //保存返回命令的数据长度                   
+                    for(i=0;i<12;i++)                                        //需要12个reg,message 12个
                     {
-                        modnet_inputreg_buf[mapaddress+i]=hart_recv_buf[i*2+8]*0x100+hart_recv_buf[i*2+9];
+                        modnet_inputreg_buf[mapaddress+2+i]=hart_recv_buf[i*2+10]*0x100+hart_recv_buf[i*2+11];
                     }                                                        //将返回的结果放入modnet存储区
                 semaphore_v(sem_mb_inputreg_id);                             //退出临界区
                 if(hart_debug_mode)
@@ -493,33 +561,36 @@ unsigned int Hart_ComDO()
                     syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV_CMD=12][%s]Write to InputReg=%d",coms.sPortName,mapaddress+1);
                 }
                 break;
-            case 13:                                                         //读取标签(6Byte),描述符(12Byte),日期(3Byte)
+            case 13:                                                         //读取标签(6Byte),描述符(12Byte),日期(3Byte),需要13reg
                 semaphore_p(sem_mb_inputreg_id);                             //进入临界区
-                    for(i=0;i<10;i++)                                        //需要10个reg,响应码1个,保存标签3个(6Byte),描述符6个(12Byte)
+                    modnet_inputreg_buf[mapaddress]=hart_recv_buf[8]*0x100+hart_recv_buf[9];        //保存响应码
+                    modnet_inputreg_buf[mapaddress+1]=in_len;                //保存返回命令的数据长度
+                    for(i=0;i<9;i++)                                         //需要9个reg,保存标签3个(6Byte),描述符6个(12Byte)
                     {
-                        modnet_inputreg_buf[mapaddress+i]=hart_recv_buf[i*2+8]*0x100+hart_recv_buf[i*2+9];
+                        modnet_inputreg_buf[mapaddress+2+i]=hart_recv_buf[i*2+10]*0x100+hart_recv_buf[i*2+11];
                     }                                                            
-                    modnet_inputreg_buf[mapaddress+10]=hart_recv_buf[28]*0x100+hart_recv_buf[29];   //保存日期-日,月
-                    modnet_inputreg_buf[mapaddress+11]=hart_recv_buf[30];                           //保存日期-年
+                    modnet_inputreg_buf[mapaddress+11]=hart_recv_buf[28]*0x100+hart_recv_buf[29];   //保存日期-日,月
+                    modnet_inputreg_buf[mapaddress+12]=hart_recv_buf[30];                           //保存日期-年
                 semaphore_v(sem_mb_inputreg_id);                             //退出临界区
                 if(hart_debug_mode)
                 {
                     syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV_CMD=13][%s]Write to InputReg=%d",coms.sPortName,mapaddress+1);
                 }
                 break;
-            case 14:                                                            //读PV传感器序列号,上下限,单位精度代码,需要10个Reg
+            case 14:                                                            //读PV传感器序列号,上下限,单位精度代码,需要11个Reg
                 semaphore_p(sem_mb_inputreg_id);                                //进入临界区
                     modnet_inputreg_buf[mapaddress]=hart_recv_buf[8]*0x100+hart_recv_buf[9];        //保存响应码
-                    modnet_inputreg_buf[mapaddress+1]=hart_recv_buf[10];            //序列号,3Byte,需要2个Reg
-                    modnet_inputreg_buf[mapaddress+2]=hart_recv_buf[11]*0x100+hart_recv_buf[12];
-                    modnet_inputreg_buf[mapaddress+3]=hart_recv_buf[13];            //单位代码,1byte,需要1个Reg
-                    modnet_inputreg_buf[mapaddress+4]=hart_recv_buf[14]*0x100+hart_recv_buf[15];    //上限,浮点,4Byte,需要2个Reg
-                    modnet_inputreg_buf[mapaddress+5]=hart_recv_buf[16]*0x100+hart_recv_buf[17];
-                    modnet_inputreg_buf[mapaddress+6]=hart_recv_buf[18]*0x100+hart_recv_buf[19];    //下限,浮点,4Byte,需要2个Reg
-                    modnet_inputreg_buf[mapaddress+7]=hart_recv_buf[20]*0x100+hart_recv_buf[21];
-                    modnet_inputreg_buf[mapaddress+8]=hart_recv_buf[22]*0x100+hart_recv_buf[23];    //最小精度,浮点,4Byte,需要2个Reg
-                    modnet_inputreg_buf[mapaddress+9]=hart_recv_buf[24]*0x100+hart_recv_buf[25];
-                semaphore_v(sem_mb_inputreg_id);                             //退出临界区
+                    modnet_inputreg_buf[mapaddress+1]=in_len;                   //保存返回命令的数据长度
+                    modnet_inputreg_buf[mapaddress+2]=hart_recv_buf[10];        //序列号,3Byte,需要2个Reg
+                    modnet_inputreg_buf[mapaddress+3]=hart_recv_buf[11]*0x100+hart_recv_buf[12];
+                    modnet_inputreg_buf[mapaddress+4]=hart_recv_buf[13];        //单位代码,1byte,需要1个Reg
+                    modnet_inputreg_buf[mapaddress+5]=hart_recv_buf[14]*0x100+hart_recv_buf[15];    //上限,浮点,4Byte,需要2个Reg
+                    modnet_inputreg_buf[mapaddress+6]=hart_recv_buf[16]*0x100+hart_recv_buf[17];
+                    modnet_inputreg_buf[mapaddress+7]=hart_recv_buf[18]*0x100+hart_recv_buf[19];    //下限,浮点,4Byte,需要2个Reg
+                    modnet_inputreg_buf[mapaddress+8]=hart_recv_buf[20]*0x100+hart_recv_buf[21];
+                    modnet_inputreg_buf[mapaddress+9]=hart_recv_buf[22]*0x100+hart_recv_buf[23];    //最小精度,浮点,4Byte,需要2个Reg
+                    modnet_inputreg_buf[mapaddress+10]=hart_recv_buf[24]*0x100+hart_recv_buf[25];
+                semaphore_v(sem_mb_inputreg_id);                                //退出临界区
                 if(hart_debug_mode)
                 {
                     syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV_CMD=14][%s]Write to InputReg=%d",coms.sPortName,mapaddress+1);
@@ -528,31 +599,34 @@ unsigned int Hart_ComDO()
             case 15:                                                            //报警选择代码1Byte,功能代码1Byte,量程单位代码1Byte,
                                                                                 //量程上限,浮点,4Byte,量程下限,浮点,4Byte,阻尼值,浮点,4Byte,
                                                                                 //写保护代码1Byte,发行商代码1Byte
-                                                                                //需要12个Reg
+                                                                                //需要13个Reg
                 semaphore_p(sem_mb_inputreg_id);                                //进入临界区
                     modnet_inputreg_buf[mapaddress]=hart_recv_buf[8]*0x100+hart_recv_buf[9];        //保存响应码
-                    modnet_inputreg_buf[mapaddress+1]=hart_recv_buf[10];            //报警选择代码,1Byte,需要1个Reg
-                    modnet_inputreg_buf[mapaddress+2]=hart_recv_buf[11];            //功能代码,1Byte,需要1Reg
-                    modnet_inputreg_buf[mapaddress+3]=hart_recv_buf[12];            //量程单位代码,1byte,需要1个Reg
-                    modnet_inputreg_buf[mapaddress+4]=hart_recv_buf[13]*0x100+hart_recv_buf[14];    //量程上限,浮点,4Byte,需要2个Reg
-                    modnet_inputreg_buf[mapaddress+5]=hart_recv_buf[15]*0x100+hart_recv_buf[16];
-                    modnet_inputreg_buf[mapaddress+6]=hart_recv_buf[17]*0x100+hart_recv_buf[18];    //量程下限,浮点,4Byte,需要2个Reg
-                    modnet_inputreg_buf[mapaddress+7]=hart_recv_buf[19]*0x100+hart_recv_buf[20];
-                    modnet_inputreg_buf[mapaddress+8]=hart_recv_buf[21]*0x100+hart_recv_buf[22];    //阻尼,浮点,4Byte,需要2个Reg
-                    modnet_inputreg_buf[mapaddress+9]=hart_recv_buf[23]*0x100+hart_recv_buf[24];
-                    modnet_inputreg_buf[mapaddress+10]=hart_recv_buf[25];           //写保护代码,1Byte,需要1个Reg
-                    modnet_inputreg_buf[mapaddress+11]=hart_recv_buf[26];           //发行商代码,1Byte,需要1个Reg
+                    modnet_inputreg_buf[mapaddress+1]=in_len;                   //保存返回命令的数据长度
+                    modnet_inputreg_buf[mapaddress+2]=hart_recv_buf[10];            //报警选择代码,1Byte,需要1个Reg
+                    modnet_inputreg_buf[mapaddress+3]=hart_recv_buf[11];            //功能代码,1Byte,需要1Reg
+                    modnet_inputreg_buf[mapaddress+4]=hart_recv_buf[12];            //量程单位代码,1byte,需要1个Reg
+                    modnet_inputreg_buf[mapaddress+5]=hart_recv_buf[13]*0x100+hart_recv_buf[14];    //量程上限,浮点,4Byte,需要2个Reg
+                    modnet_inputreg_buf[mapaddress+6]=hart_recv_buf[15]*0x100+hart_recv_buf[16];
+                    modnet_inputreg_buf[mapaddress+7]=hart_recv_buf[17]*0x100+hart_recv_buf[18];    //量程下限,浮点,4Byte,需要2个Reg
+                    modnet_inputreg_buf[mapaddress+8]=hart_recv_buf[19]*0x100+hart_recv_buf[20];
+                    modnet_inputreg_buf[mapaddress+9]=hart_recv_buf[21]*0x100+hart_recv_buf[22];    //阻尼,浮点,4Byte,需要2个Reg
+                    modnet_inputreg_buf[mapaddress+10]=hart_recv_buf[23]*0x100+hart_recv_buf[24];
+                    modnet_inputreg_buf[mapaddress+11]=hart_recv_buf[25];           //写保护代码,1Byte,需要1个Reg
+                    modnet_inputreg_buf[mapaddress+12]=hart_recv_buf[26];           //发行商代码,1Byte,需要1个Reg
                 semaphore_v(sem_mb_inputreg_id);                                    //退出临界区
                 if(hart_debug_mode)
                 {
                     syslog(LOG_DEBUG,"[DEBUG][HartGW][RECV_CMD=15][%s]Write to InputReg=%d",coms.sPortName,mapaddress+1);
                 }
                 break;
-            case 16:                                                             //读取最终装配号3Byte,需要3Reg
+            case 16:                                                             //读取最终装配号3Byte,需要5Reg
                 semaphore_p(sem_mb_inputreg_id);                                 //进入临界区
                     modnet_inputreg_buf[mapaddress]=hart_recv_buf[8]*0x100+hart_recv_buf[9];    //保存响应码
-                    modnet_inputreg_buf[mapaddress+1]=hart_recv_buf[10];                        //最终装配号,3Byte
-                    modnet_inputreg_buf[mapaddress+2]=hart_recv_buf[11]*0x100+hart_recv_buf[12];//功能代码,1Byte,需要1Reg
+                    modnet_inputreg_buf[mapaddress+1]=in_len;                    //保存返回命令的数据长度
+                    modnet_inputreg_buf[mapaddress+2]=hart_recv_buf[10];                        //最终装配号,3Byte
+                    modnet_inputreg_buf[mapaddress+3]=hart_recv_buf[11]*0x100+hart_recv_buf[12];
+                    modnet_inputreg_buf[mapaddress+4]=hart_recv_buf[13];        //功能代码,1Byte,需要1Reg
                 semaphore_v(sem_mb_inputreg_id);                                //退出临界区
                 if(hart_debug_mode)
                 {
@@ -631,8 +705,8 @@ int main(int argc, char **argv)
         if(hart_run_status_reg)
             Hart_ComStatus();
         //延迟5ms,然后进行下一次处理,经过测试证明usleep给出的参数<5000延迟5ms,5000-10000延迟10ms
-        usleep(1000);
+        usleep(5000);
     }
-    // 关闭串口 
-    UART_Close();           
+
+    return 0;           
 }
